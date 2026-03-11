@@ -9,8 +9,8 @@ OBJECTS = $(SOURCES:.c=.o)
 
 all: $(TARGET)
 install: $(TARGET)
-	install -m 755 $(TARGET) /usr/local/lib/
-	install -m 644 $(INCDIR)/*.h /usr/local/include/
+	install -m 755 $(TARGET) /usr/lib/
+	install -m 644 $(INCDIR)/*.h /usr/include/
 	mkdir -p /etc/vvcam
 	cp -r configs/* /etc/vvcam/
 
