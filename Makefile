@@ -7,22 +7,22 @@ TARGET = libvvcam.so
 SOURCES = $(wildcard $(SOURCEDIR)/*.c)
 OBJECTS = $(SOURCES:.c=.o)
 
-# 新增 dectet 相关变量
-DECTET_DIR = dectet
-DECTET_SOURCES = $(wildcard $(DECTET_DIR)/*.c)
-DECTET_OBJECTS = $(DECTET_SOURCES:.c=.o)
-DECTET_TARGET = dectet_sensor
+# 新增 detect 相关变量
+DETECT_DIR = detect
+DETECT_SOURCES = $(wildcard $(DETECT_DIR)/*.c)
+DETECT_OBJECTS = $(DETECT_SOURCES:.c=.o)
+DETECT_TARGET = detect_sensor
 
-all: $(TARGET) $(DECTET_TARGET)
+all: $(TARGET) $(DETECT_TARGET)
 
-install: install-lib install-dectet install-configs
+install: install-lib install-detect install-configs
 
 install-lib: $(TARGET)
 	install -m 755 $(TARGET) /usr/lib/
 	install -m 644 $(INCDIR)/*.h /usr/include/
 
-install-dectet: $(DECTET_TARGET)
-	install -m 755 $(DECTET_TARGET) /usr/bin/
+install-detect: $(DETECT_TARGET)
+	install -m 755 $(DETECT_TARGET) /usr/bin/
 
 install-configs:
 	mkdir -p /etc/vvcam
@@ -31,18 +31,18 @@ install-configs:
 $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-$(DECTET_TARGET): $(DECTET_OBJECTS)
+$(DETECT_TARGET): $(DETECT_OBJECTS)
 	$(CC) -o $@ $^ -I$(INCDIR)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -I$(INCDIR) -c $< -o $@
 
-$(DECTET_DIR)/%.o: $(DECTET_DIR)/%.c
+$(DETECT_DIR)/%.o: $(DETECT_DIR)/%.c
 	$(CC) $(filter-out -fPIC -shared, $(CFLAGS)) -I$(INCDIR) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(DECTET_OBJECTS) $(TARGET) $(DECTET_TARGET)
+	rm -f $(OBJECTS) $(DETECT_OBJECTS) $(TARGET) $(DETECT_TARGET)
 
-.PHONY: all clean install install-lib install-dectet install-configs
+.PHONY: all clean install install-lib install-detect install-configs
 
-$(OBJECTS) $(DECTET_OBJECTS): | $(INCDIR)
+$(OBJECTS) $(DETECT_OBJECTS): | $(INCDIR)
