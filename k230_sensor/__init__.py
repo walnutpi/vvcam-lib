@@ -1,7 +1,7 @@
 
 import fcntl
 import struct
-from _SensorSetting import SensorSetting
+from ._SensorSetting import SensorSetting
 
 QQVGA = [320, 240]
 QVGA = [320, 240]

@@ -8,7 +8,7 @@ import cv2,time
 import k230_display
 import walnutpi_imgxfer as imgxfer
 
-import sensor
+import k230_sensor as sensor
 # sensor = sensor.Sensor(1920, 1080)
 sensor = sensor.Sensor(1280, 960)
 sensor.run()
