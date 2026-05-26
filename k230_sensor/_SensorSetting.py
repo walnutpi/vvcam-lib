@@ -11,9 +11,10 @@ class SensorMode:
 
 class SensorSetting:
     mode: list[SensorMode] = []
-    def __init__(self, i2c_addr: int, sensor: str):
+    def __init__(self, i2c_addr: int, sensor: str, mode: list[SensorMode] = []):
         self.i2c_addr = i2c_addr
         self.sensor = sensor
+        self.mode = mode
 
     def check_i2c(self, i2c_bus: int = 0) -> bool:
         '''
@@ -51,9 +52,6 @@ class SensorSetting:
         finally:
             # 关闭I2C设备
             fd.close()
-    
-    def register_mode(self, width: int, height: int, fps: int, mode: int):
-        self.mode.append(SensorMode(width, height, fps, mode))
     
     def get_mode(self, width: int, height: int, fps: int) -> SensorMode:
         '''

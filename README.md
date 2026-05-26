@@ -8,10 +8,10 @@ sudo ./install.sh
 开机时需要先运行 run_isp_media.sh 脚本
 
 ## python库
-摄像头会存在几种分辨率设置，会影响帧率和画面形变，提供了这个python库来切换摄像头配置
-
+sensor库继承自opencv的 cv2.VideoCapture ，加入了对摄像头的初始化功能。返回值与 opencv的该api完全通用
 ```python
-import k230_sensor
-sensor = k230_sensor.Sensor(width=1920, height=1080, fps=60)
-sensor.run()
+import k230_sensor as sensor
+
+cap = sensor.Sensor(1, 1280, 960)
+ret, img = cap.read() # 摄像头读取一帧图像    
 ```
