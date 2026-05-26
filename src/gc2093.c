@@ -505,7 +505,7 @@ static const struct reg_list gc2093_mipi2lane_1080p_60fps_mclk_24m_linear[] = {
 };
 
 static const struct reg_list gc2093_mipi2lane_960p_90fps_mclk_24m_linear[] = {
-    //MCLK = 24MHz, PCLK = 120MHz = 2628 x 1074 x 85.03/2
+    //MCLK = 24MHz, PCLK = 96MHz 
     /****system****/
     {0x03fe, 0xf0},
     {0x03fe, 0xf0},
@@ -515,9 +515,9 @@ static const struct reg_list gc2093_mipi2lane_960p_90fps_mclk_24m_linear[] = {
     {0x03f3, 0x00},
     {0x03f4, 0x36},
     {0x03f5, 0xc0},
-    {0x03f6, 0x0d},	//refmp_div = 5 (for 24MHz MCLK to get 120MHz PCLK)
+    {0x03f6, 0x0B},	//refmp_div 改为0x0B（原0x0d）
     {0x03f7, 0x01},
-    {0x03f8, 0xc4},	//PLL config for 120MHz PCLK
+    {0x03f8, 0x60},	//PLL config 得到96MHz PCLK
     {0x03f9, 0x40},
     {0x03fc, 0x8e},
     /****CISCTL & ANALOG****/
@@ -535,11 +535,11 @@ static const struct reg_list gc2093_mipi2lane_960p_90fps_mclk_24m_linear[] = {
     {0x0004, 0x64},
     {0x0005, 0x02},	//line length = 0x291 = 657 x 4 = 2628
     {0x0006, 0x91},
-    {0x0007, 0x00},	//VBlank
-    {0x0008, 0x5a},	//VTS low byte (for frame_length=1074)
-    {0x0009, 0x00},	//y start = 0x3e = 62
+    {0x0007, 0x06},  
+    {0x0008, 0x00},  
+    {0x0009, 0x00},	//y start
     {0x000a, 0x3e},
-    {0x000b, 0x02},	//x start = 0x144 = 324
+    {0x000b, 0x02},	//x start
     {0x000c, 0x88},
     {0x000d, 0x03},	//win_height = 964
     {0x000e, 0xc4},
@@ -547,13 +547,10 @@ static const struct reg_list gc2093_mipi2lane_960p_90fps_mclk_24m_linear[] = {
     {0x0010, 0x08},
     {0x0013, 0x15},
     {0x0019, 0x0c},
-#if defined (CONFIG_MPP_SENSOR_GC2093_ON_CSI0_USE_CHIP_CLK) || defined (CONFIG_MPP_SENSOR_GC2093_ON_CSI1_USE_CHIP_CLK) || defined (CONFIG_MPP_SENSOR_GC2093_ON_CSI2_USE_CHIP_CLK)
-    {0x0041, 0x04},	// frame length = 0x0432 = 1074
-    {0x0042, 0x32},
-#else
-    {0x0041, 0x04},	// frame length = 0x0432 = 1074
-    {0x0042, 0x32},
-#endif
+
+    {0x0041, 0x06},  // frame_length = 0x0600 = 1536
+    {0x0042, 0x00},
+
     {0x0053, 0x60},
     {0x008d, 0x92},
     {0x0090, 0x00},
@@ -661,12 +658,13 @@ static const struct reg_list gc2093_mipi2lane_960p_90fps_mclk_24m_linear[] = {
     {0x019a, 0x06},
     {0x007b, 0x2a},
     {0x0023, 0x2d},
-    {0x0201, 0x27},
-    {0x0202, 0x56},
-    {0x0203, 0xb6},
-    {0x0212, 0x80},
-    {0x0213, 0x07},
-    {0x0215, 0x10},
+    // MIPI timing - 使用与1080p@96MHz相同的配置
+    {0x0201, 0x27}, 
+    {0x0202, 0x56}, 
+    {0x0203, 0xb6}, 
+    {0x0212, 0x80}, 
+    {0x0213, 0x07}, 
+    {0x0215, 0x10}, 
     {0x003e, 0x91},
     {0, 0x00},
 };
