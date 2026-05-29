@@ -2,12 +2,12 @@ import cv2,time
 import k230_display
 import k230_sensor
 
+from walnutpi import YOLO11,Display,Sensor,Imgxfer
 # 初始化屏幕
 k230_display.init()
 
 # 打开摄像头
-cap = k230_sensor.Sensor(1, 1280, 960)
-# cap = sensor.Sensor(1, 1920, 1080)
+cap = k230_sensor.Sensor(1, 640, 480)
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
@@ -25,15 +25,16 @@ while True:
         count=0
         pt=time.time()
         print("FPS:",fps)
-    
+
     # 摄像头读取一帧图像    
     ret, img = cap.read()
     if not ret:
         print("Can't receive frame (stream end?). Exiting ...")
         break
-    
-    cv2.putText(img, 'FPS: '+str(fps), (10,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,0,255), 2) #图像绘制帧率
-    k230_display.show(img)
 
+    cv2.putText(img, 'FPS: '+str(fps), (10,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,0,255), 2) #图像绘制帧率
+
+    # k230_display.show(img)
+    Imgxfer.push_frame(img)
     
 cap .release() # 关闭摄像头
