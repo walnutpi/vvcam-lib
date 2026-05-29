@@ -40,8 +40,8 @@ class Sensor(cv2.VideoCapture):
         self.sensor.set_mode(self.mode.mode)
 
         super().__init__(index)
-        self.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # 设置宽度
-        self.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)  # 设置长度
+        self.set(cv2.CAP_PROP_FRAME_WIDTH, width)  # 设置宽度
+        self.set(cv2.CAP_PROP_FRAME_HEIGHT, height)  # 设置长度
 
     def read(self):
         ret, img = super().read()
