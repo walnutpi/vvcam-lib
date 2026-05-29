@@ -10,11 +10,11 @@ class SensorMode:
         self.mode = mode
 
 class SensorSetting:
-    mode: list[SensorMode] = []
+    mode_list: list[SensorMode] = []
     def __init__(self, i2c_addr: int, sensor: str, mode: list[SensorMode] = []):
         self.i2c_addr = i2c_addr
         self.sensor = sensor
-        self.mode = mode
+        self.mode_list = mode
 
     def check_i2c(self, i2c_bus: int = 0) -> bool:
         '''
@@ -58,13 +58,13 @@ class SensorSetting:
         传入宽度、高度、帧率，返回最接近的SensorMode对象
         优先选择宽高大于传入参数的模式
         '''
-        if not self.mode:
+        if not self.mode_list:
             return None
         
         best_mode = None
         min_diff = float('inf')
         
-        for m in self.mode:
+        for m in self.mode_list:
             if m.width >= width and m.height >= height:
                 diff = abs(m.width - width) + abs(m.height - height) + abs(m.fps - fps)
                 
@@ -74,19 +74,20 @@ class SensorSetting:
         
         if best_mode is None:
             min_diff = float('inf')
-            for m in self.mode:
+            for m in self.mode_list:
                 diff = abs(m.width - width) + abs(m.height - height) + abs(m.fps - fps)
                 if diff < min_diff:
                     min_diff = diff
                     best_mode = m
-        
-        return best_mode
-    def set_mode(self, mode_num: int):
+            return self.mode_list[0]
+        else :
+            return best_mode
+    def set_mode(self, mode: SensorMode):
         '''
         设置传感器模式并写入ISP配置
-        :param mode: 模式编号
+        :param mode: SensorMode对象，包含宽度、高度、帧率和模式编号
         '''
-        mode = self.mode[mode_num]
+        print(f"Setting sensor to mode {mode.mode}")
         try:
             # 写入sensor名称
             with open(DEV_ISP, 'w') as fp:
@@ -94,7 +95,7 @@ class SensorSetting:
             
             # 写入mode
             with open(DEV_ISP, 'w') as fp:
-                fp.write(f"0 mode={mode_num}\n")
+                fp.write(f"0 mode={mode.mode}\n")
             
             # 写入xml路径
             with open(DEV_ISP, 'w') as fp:
@@ -107,7 +108,7 @@ class SensorSetting:
             # 写入auto json路径
             with open(DEV_ISP, 'w') as fp:
                 fp.write(f"0 auto_json=/etc/vvcam/{self.sensor}-{mode.width}x{mode.height}_auto.json\n")
-                
-            print(f"ISP settings written for sensor {self.sensor}, mode {mode_num}")
+            
+            print(f"ISP settings written for sensor {self.sensor}, mode {mode.mode}")
         except Exception as e:
             print(f"Failed to write ISP settings: {e}")

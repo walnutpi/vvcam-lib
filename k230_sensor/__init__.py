@@ -14,7 +14,7 @@ gc2093 = SensorSetting(
     i2c_addr=0x37,
     sensor="gc2093",
     mode=[
-        SensorMode(1920, 1080, 30, 0),
+        # SensorMode(1920, 1080, 30, 0),
         SensorMode(1920, 1080, 60, 1),
     ]
 )
@@ -41,8 +41,9 @@ class Sensor(cv2.VideoCapture):
 
     def read(self):
         ret, img = super().read()
-        img = img[0:self.height, 0:self.width]
-        img = cv2.resize(img, (self.width, self.height))
+        if self.mode.width != self.width or self.mode.height != self.height:
+            img = img[0:self.height, 0:self.width]
+            img = cv2.resize(img, (self.width, self.height))
         # bgr转rgb，因为cv2默认是bgr格式，而isp默认返回rgb格式
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -76,7 +77,8 @@ class Sensor(cv2.VideoCapture):
             the_nearest_height = sensor_mode.height
         self.set(cv2.CAP_PROP_FRAME_WIDTH, the_nearest_width)  # 设置宽度
         self.set(cv2.CAP_PROP_FRAME_HEIGHT, the_nearest_height)  # 设置长度
-        self.sensor.set_mode(self.sensor.get_mode(width, height, self.fps).mode)
+        self.mode = self.sensor.get_mode(width, height, self.fps)
+        self.sensor.set_mode(self.mode)
 
     def set_hmirror(self, hmirror:bool=True):
         pass

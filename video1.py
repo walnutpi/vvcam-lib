@@ -8,6 +8,7 @@ k230_display.init()
 
 # 打开摄像头
 cap = k230_sensor.Sensor(1, 640, 480)
+# cap = k230_sensor.Sensor(1, 1920, 1080)
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
