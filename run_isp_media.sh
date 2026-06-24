@@ -11,4 +11,4 @@ modprobe vvcam_video
 chmod 777 /proc/vsi/isp_subdev0
 ISP_MEDIA_SENSOR_DRIVER=/usr/lib/libvvcam.so /usr/bin/isp_media_server_debian >/tmp/isp.err.log 2>&1 &
 sleep 1
-python3 -c "import k230_sensor as sensor; s = sensor.Sensor(1920, 1080); s.run()" &
+python3 -c "import k230_sensor; cap = k230_sensor.Sensor(1, 1920, 1080)" &
