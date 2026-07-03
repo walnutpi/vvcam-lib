@@ -2,9 +2,9 @@ import cv2,time
 import k230_display
 import k230_sensor
 
-from walnutpi import YOLO11,Display,Sensor,Imgxfer
+from walnutpi import Display,IDE
 # 初始化屏幕
-k230_display.init()
+Display.init()
 
 # 打开摄像头
 cap = k230_sensor.Sensor(1, 640, 480)
@@ -35,7 +35,7 @@ while True:
 
     cv2.putText(img, 'FPS: '+str(fps), (10,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,0,255), 2) #图像绘制帧率
 
-    # k230_display.show(img)
-    Imgxfer.push_frame(img)
+    Display.show(img)
+    # IDE.show(img)
     
 cap .release() # 关闭摄像头
