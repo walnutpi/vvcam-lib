@@ -20,3 +20,6 @@ Homepage = "https://github.com/walnutpi/vvcam-lib"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["k230_sensor*"]
+
+[tool.setuptools.package-data]
+k230_sensor = ["v4l-cam/*.so"]

@@ -7,12 +7,19 @@ from walnutpi import Display,IDE
 Display.init()
 
 # 打开摄像头
-cap = k230_sensor.Sensor(1, 640, 480)
-# cap = k230_sensor.Sensor(1, 1920, 1080)
+cap = k230_sensor.Sensor(640, 480)
+
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
 
+ret, img = cap.read()
+Display.show(img)
+ret, img = cap.read()
+Display.show(img)
+
+cap.set_hmirror(True) # 水平镜像
+# cap.set_vflip(True) # 垂直翻转
 
 count=0
 pt=0
@@ -34,7 +41,6 @@ while True:
         break
 
     cv2.putText(img, 'FPS: '+str(fps), (10,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,0,255), 2) #图像绘制帧率
-
     Display.show(img)
     # IDE.show(img)
     
