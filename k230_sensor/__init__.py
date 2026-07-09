@@ -75,6 +75,8 @@ class Sensor:
         self.fps = 60
         self.sensor = self._scan_sensor()
         self._ctx = None
+        self._hmirror = False
+        self._vflip = False
 
         # determine the nearest 16:9 sensor mode and the V4L2 resolution
         # that preserves aspect ratio (avoids distortion)
@@ -135,15 +137,45 @@ class Sensor:
         if not self._ctx:
             raise RuntimeError("v4l_cam_open failed in set_framesize")
 
-    def set_hmirror(self, enable: bool = True):
-        """Hardware horizontal mirror (V4L2_CID_HFLIP)."""
+    def _reopen(self):
+        """Close and re-open the V4L2 device from scratch."""
         if self._ctx:
-            _lib.v4l_cam_set_hmirror(self._ctx, 1 if enable else 0)
+            _lib.v4l_cam_close(self._ctx)
+            self._ctx = None
+        self.sensor.set_mode(self.mode)
+        self._ctx = _lib.v4l_cam_open(1, self._v4l2_w, self._v4l2_h)
+        if not self._ctx:
+            raise RuntimeError("v4l_cam_open failed during reopen")
+
+    def set_hmirror(self, enable: bool = True):
+        """Hardware horizontal mirror (V4L2_CID_HFLIP).
+        
+        Because most V4L2 drivers do not allow changing this control while
+        the stream is active, we close and re-open the device internally.
+        """
+        if not self._ctx:
+            return
+        enable = bool(enable)
+        if enable == self._hmirror:
+            return
+        self._hmirror = enable
+        self._reopen()
+        _lib.v4l_cam_set_hmirror(self._ctx, 1 if enable else 0)
 
     def set_vflip(self, enable: bool = True):
-        """Hardware vertical flip (V4L2_CID_VFLIP)."""
-        if self._ctx:
-            _lib.v4l_cam_set_vflip(self._ctx, 1 if enable else 0)
+        """Hardware vertical flip (V4L2_CID_VFLIP).
+        
+        Because most V4L2 drivers do not allow changing this control while
+        the stream is active, we close and re-open the device internally.
+        """
+        if not self._ctx:
+            return
+        enable = bool(enable)
+        if enable == self._vflip:
+            return
+        self._vflip = enable
+        self._reopen()
+        _lib.v4l_cam_set_vflip(self._ctx, 1 if enable else 0)
 
     def isOpened(self):
         """Compatibility with cv2.VideoCapture API."""

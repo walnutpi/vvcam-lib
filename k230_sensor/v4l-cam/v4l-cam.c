@@ -95,7 +95,16 @@ static int lazy_setup(v4l_cam_ctx_t *ctx)
     struct v4l2_requestbuffers req;
     struct v4l2_buffer buf;
 
-    /* 1. REQBUFS */
+    /* 1. REQBUFS — release any previously allocated buffers first,
+     *    then request fresh ones.  The REQBUFS(count=0) step gives
+     *    the ISP driver a clean slate so dequeue won't see stale
+     *    state after a reopen cycle. */
+    memset(&req, 0, sizeof(req));
+    req.count  = 0;
+    req.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    req.memory = V4L2_MEMORY_MMAP;
+    xioctl(ctx->fd, VIDIOC_REQBUFS, &req);  /* ignore failure — best-effort */
+
     memset(&req, 0, sizeof(req));
     req.count  = MAX_BUFS;
     req.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -241,6 +250,32 @@ void v4l_cam_close(v4l_cam_ctx_t* ctx)
     if (!ctx) return;
 
     if (ctx->fd >= 0) {
+        /* Drain: wait briefly for any in-flight frame, then DQBUF
+         * and immediately re-queue.  This lets the driver finish
+         * its current transfer before STREAMOFF without starving
+         * the hardware of buffers.  We drain at most buf_count
+         * buffers to avoid an infinite loop. */
+        if (ctx->streaming && ctx->buf_count > 0) {
+            struct pollfd pf;
+            pf.fd      = ctx->fd;
+            pf.events  = POLLIN | POLLPRI;
+            pf.revents = 0;
+
+            for (int i = 0; i < ctx->buf_count; i++) {
+                if (poll(&pf, 1, 100) <= 0)
+                    break;  /* no more frames pending */
+                struct v4l2_buffer buf;
+                memset(&buf, 0, sizeof(buf));
+                buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                buf.memory = V4L2_MEMORY_MMAP;
+                if (xioctl(ctx->fd, VIDIOC_DQBUF, &buf) < 0)
+                    break;
+                /* re-queue immediately — keep the buffer pool
+                 * intact so the ISP driver stays in a clean state */
+                xioctl(ctx->fd, VIDIOC_QBUF, &buf);
+            }
+        }
+
         if (ctx->streaming) {
             int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             xioctl(ctx->fd, VIDIOC_STREAMOFF, &type);
@@ -276,21 +311,28 @@ int v4l_cam_read(v4l_cam_ctx_t* ctx,
         }
     }
 
-    /* wait for frame */
+    /* wait for frame — give up after 3 consecutive timeouts */
     pf.fd      = ctx->fd;
     pf.events  = POLLIN | POLLPRI;
     pf.revents = 0;
 
-    while (1) {
-        int ret = poll(&pf, 1, 1000);
-        if (ret < 0 && errno == EINTR)
-            continue;
-        if (ret < 0) {
-            fprintf(stderr, "[v4l-cam] poll error: %s\n", strerror(errno));
-            return -1;
+    {
+        int timeouts = 0;
+        while (1) {
+            int ret = poll(&pf, 1, 1000);
+            if (ret < 0 && errno == EINTR)
+                continue;
+            if (ret < 0) {
+                fprintf(stderr, "[v4l-cam] poll error: %s\n", strerror(errno));
+                return -1;
+            }
+            if (ret > 0) break;
+            fprintf(stderr, "[v4l-cam] poll timeout (%d/3)\n", ++timeouts);
+            if (timeouts >= 3) {
+                fprintf(stderr, "[v4l-cam] too many timeouts, giving up\n");
+                return -1;
+            }
         }
-        if (ret > 0) break;
-        fprintf(stderr, "[v4l-cam] poll timeout\n");
     }
 
     /* dequeue filled buffer */

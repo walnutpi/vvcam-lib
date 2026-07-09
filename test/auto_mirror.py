@@ -1,3 +1,6 @@
+'''
+每秒自动对摄像头图像水平镜像
+'''
 import cv2,time
 import k230_display
 import k230_sensor
@@ -12,13 +15,13 @@ cap = k230_sensor.Sensor(640, 480)
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
+ret, img = cap.read()
 
-# cap.set_hmirror(True) # 水平镜像
-# cap.set_vflip(True) # 垂直翻转
 
 count=0
 pt=0
 fps = 0
+mirrof=False
 while True:
     #计算帧率
     count+=1    
@@ -28,6 +31,9 @@ while True:
         count=0
         pt=time.time()
         print("FPS:",fps)
+    mirrof = not mirrof
+    cap.set_hmirror(mirrof) # 水平镜像
+        
 
     # 摄像头读取一帧图像    
     ret, img = cap.read()
