@@ -13,7 +13,7 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-#define MAX_BUFS 8
+#define MAX_BUFS 2
 
 struct v4l_cam_ctx {
     int      fd;
