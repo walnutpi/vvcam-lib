@@ -196,7 +196,16 @@ int get_frame()
     else
         printf("VIDIOC_STREAMON ok\n");
 
-    // 9. 读取图像数据
+    // 9. 读取图像数据（始终返回最新的一帧）
+    // 驱动以 FIFO 顺序填充 buffer：读取频率远低于采集频率时，
+    // 仅 DQBUF 一次会拿到队列中最旧的帧。因此这里把当前所有已就绪的
+    // 缓冲区全部取出，只保留“最后取到的那一个”（即最新帧），
+    // 其余较旧的缓冲区立即重新入队交还给驱动继续填充。
+    struct v4l2_buffer latest_buf;
+    bool has_frame = false;
+    struct v4l2_buffer prev_buf;
+    bool has_prev = false;
+
     for (int count = 0; count < CAP_COUNT; count++)
     {
         for (;;)
@@ -225,32 +234,59 @@ int get_frame()
                 continue;
             }
 
-            struct v4l2_buffer buf;
-            memset(&buf, 0, sizeof(buf));
-            buf.type = Camera_buf_type;  // 单平面类型
-            buf.memory = V4L2_MEMORY_MMAP;
-            
-            if (-1 == ioctl(fd, VIDIOC_DQBUF, &buf))
+            // 持续 DQBUF，直到没有更多已填充的缓冲区（EAGAIN）
+            for (;;)
             {
-                printf("VIDIOC_DQBUF failed\n");
-                continue;
-            }
-            
-            // printf("第%d帧 读取缓冲区%d \n", count, buf.index);
-            char *p = buffers[buf.index].start;
-            // printf("通道前3个数据 %d %d %d \n", p[0], p[1], p[2]);
-            
-            // 保存单平面数据
-            save_image(p, count, buffers[buf.index].length);
-            
-            // 将缓冲区重新加入队列
-            if (-1 == ioctl(fd, VIDIOC_QBUF, &buf))
-            {
-                printf("VIDIOC_QBUF buf.index %d failed\n", buf.index);
-                return -1;
+                struct v4l2_buffer buf;
+                memset(&buf, 0, sizeof(buf));
+                buf.type = Camera_buf_type;
+                buf.memory = V4L2_MEMORY_MMAP;
+
+                int dq = ioctl(fd, VIDIOC_DQBUF, &buf);
+                if (dq == -1)
+                {
+                    if (errno == EAGAIN)
+                        break;          // 已无更多就绪缓冲区，prev_buf 即为最新帧
+                    if (errno == EINTR)
+                        continue;
+                    printf("VIDIOC_DQBUF failed\n");
+                    break;
+                }
+
+                // 若之前已取到一帧，把那一帧（更旧的）重新入队
+                if (has_prev)
+                {
+                    if (-1 == ioctl(fd, VIDIOC_QBUF, &prev_buf))
+                    {
+                        printf("VIDIOC_QBUF (older) failed\n");
+                    }
+                }
+                prev_buf = buf;
+                has_prev = true;
             }
 
-            break;
+            if (has_prev)
+            {
+                latest_buf = prev_buf;
+                has_frame = true;
+                break;
+            }
+        }
+
+        if (!has_frame)
+            continue;
+
+        char *p = buffers[latest_buf.index].start;
+        // printf("通道前3个数据 %d %d %d \n", p[0], p[1], p[2]);
+
+        // 保存单平面数据
+        save_image(p, count, buffers[latest_buf.index].length);
+
+        // 将最新帧所在的缓冲区也重新加入队列
+        if (-1 == ioctl(fd, VIDIOC_QBUF, &latest_buf))
+        {
+            printf("VIDIOC_QBUF (latest) failed\n");
+            return -1;
         }
     }
 

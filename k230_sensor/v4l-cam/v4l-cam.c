@@ -13,7 +13,7 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-#define MAX_BUFS 8
+#define MAX_BUFS 10
 
 struct v4l_cam_ctx {
     int      fd;
@@ -299,7 +299,6 @@ void v4l_cam_close(v4l_cam_ctx_t* ctx)
 int v4l_cam_read(v4l_cam_ctx_t* ctx,
                  uint8_t** data, int* w, int* h, int* size)
 {
-    struct v4l2_buffer buf;
     struct pollfd pf;
 
     if (!ctx || !data || !w || !h || !size) return -1;
@@ -311,7 +310,7 @@ int v4l_cam_read(v4l_cam_ctx_t* ctx,
         }
     }
 
-    /* wait for frame — give up after 3 consecutive timeouts */
+    /* wait for a frame to arrive (blocking), give up after 3 timeouts */
     pf.fd      = ctx->fd;
     pf.events  = POLLIN | POLLPRI;
     pf.revents = 0;
@@ -335,31 +334,83 @@ int v4l_cam_read(v4l_cam_ctx_t* ctx,
         }
     }
 
-    /* dequeue filled buffer */
-    memset(&buf, 0, sizeof(buf));
-    buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    if (xioctl(ctx->fd, VIDIOC_DQBUF, &buf) < 0) {
-        fprintf(stderr, "[v4l-cam] VIDIOC_DQBUF failed: %s\n", strerror(errno));
+    /* ── Drain all currently-queued buffers to reach the LATEST frame ──
+     * With MAX_BUFS buffers and a slow reader, the driver fills every
+     * buffer with consecutive frames. A single DQBUF would return the
+     * OLDEST queued frame, leaving the reader N frames behind. We instead
+     * dequeue and immediately re-queue every filled buffer, copying each
+     * one into output; the last buffer dequeued (the most recently
+     * filled) is what we keep. This leaves buffer_count unchanged (so the
+     * ISP bug workaround still applies) while guaranteeing the returned
+     * frame is the newest available at read time. */
+    int pending_index = -1;
+
+    for (;;) {
+        struct v4l2_buffer dbuf;
+
+        memset(&dbuf, 0, sizeof(dbuf));
+        dbuf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        dbuf.memory = V4L2_MEMORY_MMAP;
+        if (xioctl(ctx->fd, VIDIOC_DQBUF, &dbuf) < 0)
+            break;  /* no more frames available right now */
+
+        /* the previously held buffer is now older than this one:
+         * hand it back to the driver so it can be refilled. */
+        if (pending_index >= 0) {
+            struct v4l2_buffer qbuf;
+            memset(&qbuf, 0, sizeof(qbuf));
+            qbuf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            qbuf.memory = V4L2_MEMORY_MMAP;
+            qbuf.index  = pending_index;
+            if (xioctl(ctx->fd, VIDIOC_QBUF, &qbuf) < 0) {
+                fprintf(stderr, "[v4l-cam] VIDIOC_QBUF failed: %s\n",
+                        strerror(errno));
+                return -1;
+            }
+        }
+
+        pending_index = (int)dbuf.index;
+
+        /* copy this (newest-so-far) frame into output. It gets
+         * overwritten on the next loop iteration if even newer frames
+         * are waiting, otherwise it's the one we return. */
+        if (ctx->is_bgr) {
+            memcpy(ctx->output, ctx->bufs[dbuf.index].mmap,
+                   ctx->width * ctx->height * 3);
+        } else {
+            const uint8_t *y_plane  = ctx->bufs[dbuf.index].mmap;
+            const uint8_t *uv_plane = y_plane + ctx->width * ctx->height;
+            nv12_to_bgr_full(y_plane, uv_plane,
+                             ctx->width, ctx->height, ctx->output);
+        }
+
+        /* if another frame is already queued, keep draining; otherwise
+         * the current one is the latest and we stop. */
+        struct pollfd npf;
+        npf.fd      = ctx->fd;
+        npf.events  = POLLIN | POLLPRI;
+        npf.revents = 0;
+        if (poll(&npf, 1, 0) <= 0)
+            break;
+    }
+
+    if (pending_index < 0) {
+        fprintf(stderr, "[v4l-cam] no frame available after poll\n");
         return -1;
     }
 
-    if (ctx->is_bgr) {
-        /* ISP already output BGR24 — just memcpy */
-        memcpy(ctx->output, ctx->bufs[buf.index].mmap,
-               ctx->width * ctx->height * 3);
-    } else {
-        /* NV12 → BGR full-range software conversion */
-        const uint8_t *y_plane  = ctx->bufs[buf.index].mmap;
-        const uint8_t *uv_plane = y_plane + ctx->width * ctx->height;
-        nv12_to_bgr_full(y_plane, uv_plane,
-                         ctx->width, ctx->height, ctx->output);
-    }
-
-    /* requeue buffer */
-    if (xioctl(ctx->fd, VIDIOC_QBUF, &buf) < 0) {
-        fprintf(stderr, "[v4l-cam] VIDIOC_QBUF failed: %s\n", strerror(errno));
-        return -1;
+    /* hand the newest buffer back to the driver */
+    {
+        struct v4l2_buffer qbuf;
+        memset(&qbuf, 0, sizeof(qbuf));
+        qbuf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        qbuf.memory = V4L2_MEMORY_MMAP;
+        qbuf.index  = pending_index;
+        if (xioctl(ctx->fd, VIDIOC_QBUF, &qbuf) < 0) {
+            fprintf(stderr, "[v4l-cam] VIDIOC_QBUF failed: %s\n",
+                    strerror(errno));
+            return -1;
+        }
     }
 
     *data = ctx->output;
