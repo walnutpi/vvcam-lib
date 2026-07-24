@@ -1,4 +1,4 @@
-
+'''用于从csi摄像头读取图像的库'''
 import ctypes
 import os
 
@@ -69,9 +69,14 @@ sensor_list = [gc2093, ov5647]
 
 
 class Sensor:
-    """K230 camera sensor, backed by libv4l-cam.so for V4L2 capture."""
 
     def __init__(self, width: int = 1920, height: int = 1080) -> None:
+        """初始化摄像头传感器。
+        
+        参数:
+            width: 目标图像宽度，默认 1920。
+            height: 目标图像高度，默认 1080。
+        """
         self.fps = 60
         self.sensor = self._scan_sensor()
         self._ctx = None
@@ -94,7 +99,12 @@ class Sensor:
     # ── public API ───────────────────────────────────────────────
 
     def read(self):
-        """Read one BGR frame. Returns (True, img) or (False, None)."""
+        """读取一帧图像。
+        
+        返回:
+            (True, img): 读取成功，img 为 numpy 数组格式的 BGR 图像。
+            (False, None): 读取失败。
+        """
         data_ptr = ctypes.POINTER(ctypes.c_uint8)()
         w = ctypes.c_int()
         h = ctypes.c_int()
@@ -123,7 +133,12 @@ class Sensor:
         return True, img
 
     def set_framesize(self, width: int = 1920, height: int = 1080):
-        """Change frame size. Re-opens the V4L2 device with new resolution."""
+        """修改read函数返回的图像尺寸。
+        
+        参数:
+            width: 新的目标宽度，默认 1920。
+            height: 新的目标高度，默认 1080。
+        """
         self.width = width
         self.height = height
         self.mode = self.sensor.get_mode(width, height, self.fps)
@@ -138,7 +153,7 @@ class Sensor:
             raise RuntimeError("v4l_cam_open failed in set_framesize")
 
     def _reopen(self):
-        """Close and re-open the V4L2 device from scratch."""
+        """关闭并重新打开 V4L2 设备。"""
         if self._ctx:
             _lib.v4l_cam_close(self._ctx)
             self._ctx = None
@@ -148,10 +163,10 @@ class Sensor:
             raise RuntimeError("v4l_cam_open failed during reopen")
 
     def set_hmirror(self, enable: bool = True):
-        """Hardware horizontal mirror (V4L2_CID_HFLIP).
+        """水平镜像功能
         
-        Because most V4L2 drivers do not allow changing this control while
-        the stream is active, we close and re-open the device internally.
+        参数:
+            enable: True 开启水平镜像，False 关闭，默认 True。
         """
         if not self._ctx:
             return
@@ -163,10 +178,10 @@ class Sensor:
         _lib.v4l_cam_set_hmirror(self._ctx, 1 if enable else 0)
 
     def set_vflip(self, enable: bool = True):
-        """Hardware vertical flip (V4L2_CID_VFLIP).
-        
-        Because most V4L2 drivers do not allow changing this control while
-        the stream is active, we close and re-open the device internally.
+        """垂直翻转
+
+        参数:
+            enable: True 开启垂直翻转，False 关闭，默认 True。
         """
         if not self._ctx:
             return
@@ -178,11 +193,15 @@ class Sensor:
         _lib.v4l_cam_set_vflip(self._ctx, 1 if enable else 0)
 
     def isOpened(self):
-        """Compatibility with cv2.VideoCapture API."""
+        """判断摄像头是否已打开。
+        
+        返回:
+            bool: 摄像头已打开返回 True，否则返回 False。
+        """
         return self._ctx is not None
 
     def release(self):
-        """Close the camera."""
+        """关闭摄像头，释放 V4L2 设备资源。"""
         if self._ctx:
             _lib.v4l_cam_close(self._ctx)
             self._ctx = None
@@ -193,18 +212,28 @@ class Sensor:
     # ── internals ────────────────────────────────────────────────
 
     def _scan_sensor(self, i2c_bus: int = 0) -> SensorSetting:
-        """Scan I2C bus for known sensors."""
+        """在指定 I2C 总线上扫描已知的摄像头传感器。
+        
+        参数:
+            i2c_bus: I2C 总线编号，默认 0。
+        
+        返回:
+            SensorSetting: 匹配到的传感器配置对象，若未匹配到则默认返回 gc2093。
+        """
         for setting in sensor_list:
             if setting.check_i2c(i2c_bus):
                 return setting
         return gc2093  # fallback
 
     def _calc_v4l2_size(self, width: int, height: int):
-        """
-        Calculate the V4L2 capture resolution that preserves the sensor's
-        native aspect ratio (16:9).  When the user requests e.g. 640x480 (4:3)
-        we actually open a 16:9 resolution that covers the requested area,
-        then crop + resize in read() to avoid distortion.
+        """内部使用，计算保持传感器原始宽高比（16:9）的 V4L2 采集分辨率。
+        
+        参数:
+            width: 目标宽度。
+            height: 目标高度。
+        
+        返回:
+            tuple[int, int]: 计算后的 V4L2 采集宽度和高度。
         """
         sensor_w = self.mode.width
         sensor_h = self.mode.height
